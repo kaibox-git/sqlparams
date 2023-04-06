@@ -27,15 +27,19 @@ var (
 	convertableTypes   = []reflect.Type{reflect.TypeOf(time.Time{}), reflect.TypeOf(false), reflect.TypeOf([]byte{})}
 )
 
-func Inline(sql string, avars ...interface{}) string {
+type Number interface {
+	int | int8 | int16 | int32 | int64 | uint | uint16 | uint32 | uint64
+}
+
+func Inline(sql string, avars ...any) string {
 	avarsLen := len(avars)
 	if avarsLen == 0 {
 		return sql
 	}
 
 	var (
-		convertParams func(interface{}, interface{})
-		vars          = make(map[interface{}]string, len(avars))
+		convertParams func(any, any)
+		vars          = make(map[any]string, len(avars))
 		escaper       = `'`
 		placeholder   int
 	)
@@ -51,7 +55,7 @@ func Inline(sql string, avars ...interface{}) string {
 		return `placeholder is undefined: ` + sql
 	}
 
-	convertParams = func(v interface{}, idx interface{}) {
+	convertParams = func(v any, idx any) {
 		switch v := v.(type) {
 		case bool:
 			vars[idx] = strconv.FormatBool(v)
@@ -98,6 +102,24 @@ func Inline(sql string, avars ...interface{}) string {
 			vars[idx] = fmt.Sprintf("%.6f", v)
 		case string:
 			vars[idx] = escaper + strings.Replace(v, escaper, "\\"+escaper, -1) + escaper
+		case []int:
+			vars[idx] = sliceToArray(v)
+		case []int8:
+			vars[idx] = sliceToArray(v)
+		case []int16:
+			vars[idx] = sliceToArray(v)
+		case []int32:
+			vars[idx] = sliceToArray(v)
+		case []int64:
+			vars[idx] = sliceToArray(v)
+		case []uint:
+			vars[idx] = sliceToArray(v)
+		case []uint16:
+			vars[idx] = sliceToArray(v)
+		case []uint32:
+			vars[idx] = sliceToArray(v)
+		case []uint64:
+			vars[idx] = sliceToArray(v)
 		default:
 			rv := reflect.ValueOf(v)
 			if v == nil || !rv.IsValid() || rv.Kind() == reflect.Ptr && rv.IsNil() {
@@ -143,7 +165,7 @@ func Inline(sql string, avars ...interface{}) string {
 			} else { // a struct as parameter
 				var (
 					key string
-					v   interface{}
+					v   any
 					num int // index for numeric params
 				)
 				for i := 0; i < val.NumField(); i++ {
@@ -183,13 +205,13 @@ func Inline(sql string, avars ...interface{}) string {
 			}
 
 		case t.Kind() == reflect.Map && t.Key().Kind() == reflect.String:
-			var p interface{}
+			var p any
 			if ptr {
-				p = *avars[0].(*map[string]interface{}) // for a special case...
+				p = *avars[0].(*map[string]any) // for a special case...
 			} else {
-				p = avars[0].(map[string]interface{})
+				p = avars[0].(map[string]any)
 			}
-			for key, v := range p.(map[string]interface{}) {
+			for key, v := range p.(map[string]any) {
 				convertParams(v, key)
 			}
 		default:
@@ -248,7 +270,7 @@ func isPrintable(s []byte) bool {
 	return true
 }
 
-func toString(value interface{}) string {
+func toString(value any) string {
 	switch v := value.(type) {
 	case string:
 		return v
@@ -274,4 +296,13 @@ func toString(value interface{}) string {
 		return strconv.FormatUint(v, 10)
 	}
 	return ""
+}
+
+func sliceToArray[T Number](v []T) string {
+	var str = make([]string, 0, len(v))
+	for i := range v {
+		str = append(str, toString(v[i]))
+	}
+	return `ARRAY[` + strings.Join(str, `, `) + `]`
+
 }

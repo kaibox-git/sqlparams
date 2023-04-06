@@ -16,6 +16,7 @@ func TestInline(t *testing.T) {
 	var otherName, nullName sql.NullString
 	otherName.String = `other test string`
 	otherName.Valid = true
+	sliceInt := []int{1, 2, 3}
 
 	str := `ptr test string`
 	var strPtr = &str
@@ -24,56 +25,62 @@ func TestInline(t *testing.T) {
 	testCases := []struct {
 		name     string
 		query    string
-		params   []interface{}
+		params   []any
 		expected string
 	}{
 		{
 			name:     `1-1`,
 			query:    `$1`,
-			params:   []interface{}{123},
+			params:   []any{123},
 			expected: `123`,
 		},
 		{
 			name:     `1-2`,
 			query:    `$1`,
-			params:   []interface{}{nullName},
+			params:   []any{nullName},
 			expected: `NULL`,
 		},
 		{
 			name:     `1-3`,
 			query:    `$1`,
-			params:   []interface{}{otherName},
+			params:   []any{otherName},
 			expected: `'other test string'`,
 		},
 		{
 			name:     `1-4`,
 			query:    `$1, $2`,
-			params:   []interface{}{123, `test string`},
+			params:   []any{123, `test string`},
 			expected: `123, 'test string'`,
 		},
 		{
 			name:     `1-5`,
 			query:    `$1, $2, $3`,
-			params:   []interface{}{123, `test string`, timeDate},
+			params:   []any{123, `test string`, timeDate},
 			expected: `123, 'test string', '2009-11-17 20:34:58.651'`,
 		},
 		{
 			name:     `1-6`,
 			query:    `?, ?, ?`,
-			params:   []interface{}{123, `test string`, timeDate},
+			params:   []any{123, `test string`, timeDate},
 			expected: `123, 'test string', '2009-11-17 20:34:58.651'`,
 		},
 		{
 			name:     `1-7`,
 			query:    `$1`,
-			params:   []interface{}{timeDate},
+			params:   []any{timeDate},
 			expected: `'2009-11-17 20:34:58.651'`,
 		},
 		{
 			name:     `1-8`,
 			query:    `SELECT 1 FROM table`,
-			params:   []interface{}{timeDate},
+			params:   []any{timeDate},
 			expected: `placeholder is undefined: SELECT 1 FROM table`,
+		},
+		{
+			name:     `1-9`,
+			query:    `=ANY($1)`,
+			params:   []any{sliceInt},
+			expected: `=ANY(ARRAY[1, 2, 3])`,
 		},
 	}
 	for _, testCase := range testCases {
@@ -87,7 +94,7 @@ func TestInline(t *testing.T) {
 	testCases2 := []struct {
 		name     string
 		query    string
-		params   interface{}
+		params   any
 		expected string
 	}{
 		{
@@ -117,7 +124,7 @@ func TestInline(t *testing.T) {
 		{
 			name:  `2-5`,
 			query: `(:name, :date, :digit)`,
-			params: map[string]interface{}{
+			params: map[string]any{
 				`name`:  `test string`,
 				`date`:  timeDate,
 				`digit`: 123,
@@ -127,7 +134,7 @@ func TestInline(t *testing.T) {
 		{
 			name:  `2-6`,
 			query: `=:name, = :date, =  :digit`,
-			params: map[string]interface{}{
+			params: map[string]any{
 				`name`:  `test string`,
 				`date`:  timeDate,
 				`digit`: 123,
@@ -137,7 +144,7 @@ func TestInline(t *testing.T) {
 		{
 			name:  `2-7`,
 			query: `select some_field::text WHERE (:name, :date, :digit)`,
-			params: map[string]interface{}{
+			params: map[string]any{
 				`name`:  `test string`,
 				`date`:  timeDate,
 				`digit`: 123,
@@ -147,7 +154,7 @@ func TestInline(t *testing.T) {
 		{
 			name:  `2-8`,
 			query: `=:name, =:date, =:digit`,
-			params: &map[string]interface{}{ // for a special case...
+			params: &map[string]any{ // for a special case...
 				`name`:  `test string`,
 				`date`:  timeDate,
 				`digit`: 123,
