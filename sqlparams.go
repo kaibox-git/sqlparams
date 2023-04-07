@@ -25,10 +25,11 @@ var (
 	numericPlaceholder = regexp.MustCompile(`\$(\d+)`)             // postgres
 	namedPlaceholder   = regexp.MustCompile(`([^:])(:[a-z0-9_]+)`) // for named params
 	convertableTypes   = []reflect.Type{reflect.TypeOf(time.Time{}), reflect.TypeOf(false), reflect.TypeOf([]byte{})}
+	escaper            = `'`
 )
 
-type Number interface {
-	int | int8 | int16 | int32 | int64 | uint | uint16 | uint32 | uint64
+type CustomContraint interface {
+	int | int8 | int16 | int32 | int64 | uint | uint16 | uint32 | uint64 | string
 }
 
 func Inline(sql string, avars ...any) string {
@@ -40,7 +41,6 @@ func Inline(sql string, avars ...any) string {
 	var (
 		convertParams func(any, any)
 		vars          = make(map[any]string, len(avars))
-		escaper       = `'`
 		placeholder   int
 	)
 
@@ -102,6 +102,8 @@ func Inline(sql string, avars ...any) string {
 			vars[idx] = fmt.Sprintf("%.6f", v)
 		case string:
 			vars[idx] = escaper + strings.Replace(v, escaper, "\\"+escaper, -1) + escaper
+		case []string:
+			vars[idx] = sliceToArray(v)
 		case []int:
 			vars[idx] = sliceToArray(v)
 		case []int8:
@@ -273,7 +275,13 @@ func isPrintable(s []byte) bool {
 func toString(value any) string {
 	switch v := value.(type) {
 	case string:
-		return v
+		if strings.Contains(v, escaper) {
+			if strings.Contains(v, `\`+escaper) {
+				return escaper + v + escaper
+			}
+			return escaper + strings.ReplaceAll(v, escaper, `\`+escaper) + escaper
+		}
+		return escaper + v + escaper
 	case int:
 		return strconv.FormatInt(int64(v), 10)
 	case int8:
@@ -298,7 +306,7 @@ func toString(value any) string {
 	return ""
 }
 
-func sliceToArray[T Number](v []T) string {
+func sliceToArray[T CustomContraint](v []T) string {
 	var str = make([]string, 0, len(v))
 	for i := range v {
 		str = append(str, toString(v[i]))
