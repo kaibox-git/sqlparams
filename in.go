@@ -8,36 +8,6 @@ import (
 	"strings"
 )
 
-func asSliceForIn(i any) (v reflect.Value, ok bool) {
-	if i == nil {
-		return reflect.Value{}, false
-	}
-
-	v = reflect.ValueOf(i)
-	t := Deref(v.Type())
-
-	// Only expand slices
-	if t.Kind() != reflect.Slice {
-		return reflect.Value{}, false
-	}
-
-	// []byte is a driver.Value type so it should not be expanded
-	if t == reflect.TypeOf([]byte{}) {
-		return reflect.Value{}, false
-
-	}
-
-	return v, true
-}
-
-// Deref is Indirect for reflect.Types
-func Deref(t reflect.Type) reflect.Type {
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	return t
-}
-
 // In expands slice values in args, returning the modified query string
 // and a new arg list that can be executed by a database. The `query` should
 // use the `?` bindVar.  The return value uses the `?` bindVar.
@@ -143,6 +113,36 @@ func In(query string, args ...any) (string, []any, error) {
 	}
 
 	return buf.String(), newArgs, nil
+}
+
+func asSliceForIn(i any) (v reflect.Value, ok bool) {
+	if i == nil {
+		return reflect.Value{}, false
+	}
+
+	v = reflect.ValueOf(i)
+	t := deref(v.Type())
+
+	// Only expand slices
+	if t.Kind() != reflect.Slice {
+		return reflect.Value{}, false
+	}
+
+	// []byte is a driver.Value type so it should not be expanded
+	if t == reflect.TypeOf([]byte{}) {
+		return reflect.Value{}, false
+
+	}
+
+	return v, true
+}
+
+// deref is Indirect for reflect.Types
+func deref(t reflect.Type) reflect.Type {
+	if t.Kind() == reflect.Ptr {
+		t = t.Elem()
+	}
+	return t
 }
 
 func appendReflectSlice(args []any, v reflect.Value, vlen int) []any {

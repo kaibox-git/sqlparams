@@ -28,7 +28,7 @@ var (
 	escaper            = `'`
 )
 
-type CustomContraint interface {
+type customContraint interface {
 	int | int8 | int16 | int32 | int64 | uint | uint16 | uint32 | uint64 | string
 }
 
@@ -306,7 +306,7 @@ func toString(value any) string {
 	return ""
 }
 
-func sliceToArray[T CustomContraint](v []T) string {
+func sliceToArray[T customContraint](v []T) string {
 	var str = make([]string, 0, len(v))
 	for i := range v {
 		str = append(str, toString(v[i]))
