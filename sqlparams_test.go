@@ -238,3 +238,23 @@ func TestInline(t *testing.T) {
 	}
 
 }
+
+func TestIn(t *testing.T) {
+	var err error
+	var ids = []int{1, 2, 3}
+	var pid = 5
+	query := `SELECT id FROM table WHERE id IN (?) AND pid = ?`
+	params := []any{ids, pid}
+	query, params, err = In(query, params...)
+	require.NoError(t, err)
+	want := `SELECT id FROM table WHERE id IN (?, ?, ?) AND pid = ?`
+	require.Equal(t, want, query)
+	wantParams := []any{1, 2, 3, 5}
+	require.Equal(t, wantParams, params)
+}
+
+func TestRenind(t *testing.T) {
+	query := Rebind(`SELECT id FROM table WHERE id IN (?, ?, ?) AND pid = ?`)
+	want := `SELECT id FROM table WHERE id IN ($1, $2, $3) AND pid = $4`
+	require.Equal(t, want, query)
+}
