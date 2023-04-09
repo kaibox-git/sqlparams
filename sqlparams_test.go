@@ -229,6 +229,62 @@ func TestInline(t *testing.T) {
 			},
 			expected: `'test string', '2009-11-17 20:34:58.651', 123, 321, NULL`,
 		},
+		{
+			name:  `2-13`,
+			query: `(@name, @date, @digit)`,
+			params: map[string]any{
+				`name`:  `test string`,
+				`date`:  timeDate,
+				`digit`: 123,
+			},
+			expected: `('test string', '2009-11-17 20:34:58.651', 123)`,
+		},
+		{
+			name:  `2-14`,
+			query: `=@name, = @date, =  @digit`,
+			params: map[string]any{
+				`name`:  `test string`,
+				`date`:  timeDate,
+				`digit`: 123,
+			},
+			expected: `='test string', = '2009-11-17 20:34:58.651', =  123`,
+		},
+		{
+			name:  `2-15`,
+			query: `select some_field::text WHERE (@name, @date, @digit)`,
+			params: map[string]any{
+				`name`:  `test string`,
+				`date`:  timeDate,
+				`digit`: 123,
+			},
+			expected: `select some_field::text WHERE ('test string', '2009-11-17 20:34:58.651', 123)`,
+		},
+		{
+			name:  `2-16`,
+			query: `=@name, =@date, =@digit`,
+			params: &map[string]any{ // for a special case...
+				`name`:  `test string`,
+				`date`:  timeDate,
+				`digit`: 123,
+			},
+			expected: `='test string', ='2009-11-17 20:34:58.651', =123`,
+		},
+		{
+			name:  `2-17`,
+			query: `(@name, @date, @digit, @other_name)`,
+			params: struct {
+				Name      string
+				Date      time.Time
+				Digit     *int
+				OtherName string `db:"other_name"`
+			}{
+				`test string`,
+				timeDate,
+				intPtr,
+				`other test string`,
+			},
+			expected: `('test string', '2009-11-17 20:34:58.651', 123, 'other test string')`,
+		},
 	}
 	for _, testCase := range testCases2 {
 		t.Run(testCase.name, func(t *testing.T) {
@@ -253,7 +309,7 @@ func TestIn(t *testing.T) {
 	require.Equal(t, wantParams, params)
 }
 
-func TestRenind(t *testing.T) {
+func TestRebind(t *testing.T) {
 	query := Rebind(`SELECT id FROM table WHERE id IN (?, ?, ?) AND pid = ?`)
 	want := `SELECT id FROM table WHERE id IN ($1, $2, $3) AND pid = $4`
 	require.Equal(t, want, query)

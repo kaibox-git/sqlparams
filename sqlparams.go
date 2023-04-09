@@ -14,7 +14,8 @@ import (
 const (
 	cQuestionParams = iota + 1
 	cNumericParams
-	cNamedParams
+	cNamed1Params // :
+	cNamed2Params // @
 
 	tmFmtWithMS = "2006-01-02 15:04:05.999"
 	tmFmtZero   = "0000-00-00 00:00:00"
@@ -23,7 +24,8 @@ const (
 
 var (
 	numericPlaceholder = regexp.MustCompile(`\$(\d+)`)             // postgres
-	namedPlaceholder   = regexp.MustCompile(`([^:])(:[a-z0-9_]+)`) // for named params
+	named1Placeholder  = regexp.MustCompile(`([^:])(:[a-z0-9_]+)`) // for named params
+	named2Placeholder  = regexp.MustCompile(`(@[a-z0-9_]+)`)       // for named params
 	convertableTypes   = []reflect.Type{reflect.TypeOf(time.Time{}), reflect.TypeOf(false), reflect.TypeOf([]byte{})}
 	escaper            = `'`
 )
@@ -49,8 +51,10 @@ func Inline(sql string, avars ...any) string {
 		placeholder = cQuestionParams
 	case numericPlaceholder.MatchString(sql):
 		placeholder = cNumericParams
-	case namedPlaceholder.MatchString(sql):
-		placeholder = cNamedParams
+	case named1Placeholder.MatchString(sql):
+		placeholder = cNamed1Params
+	case named2Placeholder.MatchString(sql):
+		placeholder = cNamed2Params
 	default:
 		return `placeholder is undefined: ` + sql
 	}
@@ -197,7 +201,9 @@ func Inline(sql string, avars ...any) string {
 						}
 						v = valueField.Interface()
 					}
-					if placeholder == cNamedParams {
+					if placeholder == cNamed1Params {
+						convertParams(v, key) // index - field name for named params
+					} else if placeholder == cNamed2Params {
 						convertParams(v, key) // index - field name for named params
 					} else {
 						convertParams(v, num) // index - incremented digit
@@ -236,13 +242,21 @@ func Inline(sql string, avars ...any) string {
 			}
 			sql = strings.Replace(sql, "$"+strconv.Itoa(idx.(int)+1)+"$", v, -1)
 		}
-	case cNamedParams:
-		sql = namedPlaceholder.ReplaceAllString(sql, "$1$$$2$$")
+	case cNamed1Params:
+		sql = named1Placeholder.ReplaceAllString(sql, "$1$$$2$$")
 		for idx, v := range vars {
 			if _, ok := idx.(string); !ok {
 				break
 			}
 			sql = strings.Replace(sql, "$:"+idx.(string)+"$", v, -1)
+		}
+	case cNamed2Params:
+		sql = named2Placeholder.ReplaceAllString(sql, "$$$1$$")
+		for idx, v := range vars {
+			if _, ok := idx.(string); !ok {
+				break
+			}
+			sql = strings.Replace(sql, "$@"+idx.(string)+"$", v, -1)
 		}
 	default: // cQuestionParams
 		var idx int
