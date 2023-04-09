@@ -151,14 +151,12 @@ func Inline(sql string, avars ...any) string {
 		//
 		// reflect parameters
 		//
-		var ptr bool
 		var timeType = reflect.TypeOf(time.Time{})
 		t := reflect.TypeOf(avars[0])
 		val := reflect.ValueOf(avars[0])
 		if t.Kind() == reflect.Ptr {
 			val = val.Elem()
 			t = t.Elem()
-			ptr = true
 		}
 		switch {
 		case t.Kind() == reflect.Struct:
@@ -213,15 +211,21 @@ func Inline(sql string, avars ...any) string {
 			}
 
 		case t.Kind() == reflect.Map && t.Key().Kind() == reflect.String:
-			var p any
-			if ptr {
-				p = *avars[0].(*map[string]any) // for a special case...
+			if m, ok := avars[0].(map[string]any); ok {
+				for key, v := range m {
+					convertParams(v, key)
+				}
+
 			} else {
-				p = avars[0].(map[string]any)
+				for _, keyTmp := range val.MapKeys() {
+					key, ok := keyTmp.Interface().(string)
+					if !ok {
+						return `map key is not a string type`
+					}
+					convertParams(val.MapIndex(keyTmp).Interface(), key)
+				}
 			}
-			for key, v := range p.(map[string]any) {
-				convertParams(v, key)
-			}
+
 		default:
 			convertParams(avars[0], 0)
 		}
@@ -240,7 +244,7 @@ func Inline(sql string, avars ...any) string {
 			if _, ok := idx.(int); !ok {
 				break
 			}
-			sql = strings.Replace(sql, "$"+strconv.Itoa(idx.(int)+1)+"$", v, -1)
+			sql = strings.ReplaceAll(sql, "$"+strconv.Itoa(idx.(int)+1)+"$", v)
 		}
 	case cNamed1Params:
 		sql = named1Placeholder.ReplaceAllString(sql, "$1$$$2$$")
@@ -248,7 +252,7 @@ func Inline(sql string, avars ...any) string {
 			if _, ok := idx.(string); !ok {
 				break
 			}
-			sql = strings.Replace(sql, "$:"+idx.(string)+"$", v, -1)
+			sql = strings.ReplaceAll(sql, "$:"+idx.(string)+"$", v)
 		}
 	case cNamed2Params:
 		sql = named2Placeholder.ReplaceAllString(sql, "$$$1$$")
@@ -256,7 +260,7 @@ func Inline(sql string, avars ...any) string {
 			if _, ok := idx.(string); !ok {
 				break
 			}
-			sql = strings.Replace(sql, "$@"+idx.(string)+"$", v, -1)
+			sql = strings.ReplaceAll(sql, "$@"+idx.(string)+"$", v)
 		}
 	default: // cQuestionParams
 		var idx int
